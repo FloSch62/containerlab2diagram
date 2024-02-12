@@ -2,6 +2,9 @@
 
 `containerlab2diagram` is a tool designed to automatically generate network topology diagrams from containerlab YAML files, rendering them into visually appealing diagrams using Draw.io. This tool simplifies the process of visualizing network designs and configurations, making it easier for network engineers and architects to document and share their containerlab environments.
 
+![Drawio ](img/drawio1.png)
+
+
 ## Features
 
 - **Automatic Diagram Generation**: Converts containerlab YAML configurations into detailed Draw.io diagrams.
