@@ -12,12 +12,37 @@
 - **Tier-Based Layout**: Organizes nodes into tiers based on their connectivity for clearer topology visualization. Users can influence node placement by specifying tiers directly in the containerlab configuration.
 - **Customizable Styles**: Supports customization of node and link styles within the diagrams.
 
+## Running with Docker
+To simplify dependency management and execution, containerlab2diagram can be run inside a Docker container. Follow these instructions to build and run the tool using Docker.
+
+### Pulling from dockerhub
+```bash
+docker pull flosch62/containerlab2diagram:latest
+```
+
+### Building the Docker Image by yourself
+
+Navigate to the project directory and run:
+
+```bash
+docker build -t containerlab2diagram .
+```
+This command builds the Docker image of containerlab2diagram with the tag containerlab2diagram, using the Dockerfile located in the docker/ directory.
+
+### Running the Tool
+Run containerlab2diagram within a Docker container by mounting the directory containing your .drawio files as a volume. Specify the input and output file paths relative to the mounted volume:
+```bash
+docker run -v "$(pwd)":/data flosch62/containerlab2diagram --output-dir /data/ /data/your_input_file.yaml
+```
+Replace your_input_file.drawio with the name of your actual file. This command mounts your current directory to /data inside the container.
+
+
 ## Installation
 
 Clone the repository to your local machine:
 
 ```bash
-git clone https://github.com/yourusername/containerlab2diagram.git
+git clone https://github.com/FloSch62/containerlab2diagram.git
 cd containerlab2diagram
 ```
 
