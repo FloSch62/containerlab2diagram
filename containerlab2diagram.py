@@ -42,9 +42,43 @@ def assign_tiers(nodes, links):
 
     # Sort nodes by tier and then by name to maintain consistent ordering
     sorted_nodes = sorted(node_tiers, key=lambda n: (node_tiers[n], n))
-    return sorted_nodes, node_tiers
+    return sorted_nodes, node_tiers, connections
 
-def calculate_positions(sorted_nodes, links, node_tiers):
+def adjust_overlapping_nodes(nodes_by_tier, positions, offset_amount, orientation='vertical'):
+    """Apply a symmetric offset to overlapping nodes within each tier to separate them vertically or horizontally.
+    
+    Args:
+        nodes_by_tier (dict): Nodes organized by their tier.
+        positions (dict): Current positions of each node.
+        offset_amount (int): Amount to offset overlapping nodes in one direction; the other node will be offset oppositely.
+        orientation (str): Orientation of the layout, 'vertical' or 'horizontal'.
+    """
+    for tier, nodes in nodes_by_tier.items():
+        if orientation == 'vertical':
+            # For vertical orientation, sort by x position
+            sorted_nodes = sorted(nodes, key=lambda node: positions[node][0])
+        else:
+            # For horizontal orientation, sort by y position
+            sorted_nodes = sorted(nodes, key=lambda node: positions[node][1])
+
+        for i in range(len(sorted_nodes) - 1):
+            node = sorted_nodes[i]
+            next_node = sorted_nodes[i + 1]
+
+            if orientation == 'vertical':
+                # Check if nodes are at the same x position (indicating a potential overlap)
+                if positions[node][0] == positions[next_node][0]:
+                    # Apply symmetric offset in the x direction
+                    positions[node] = (positions[node][0] - offset_amount, positions[node][1])
+                    positions[next_node] = (positions[next_node][0] + offset_amount, positions[next_node][1])
+            else:
+                # Check if nodes are at the same y position (indicating a potential overlap)
+                if positions[node][1] == positions[next_node][1]:
+                    # Apply symmetric offset in the y direction
+                    positions[node] = (positions[node][0], positions[node][1] - offset_amount)
+                    positions[next_node] = (positions[next_node][0], positions[next_node][1] + offset_amount)
+
+def calculate_positions(sorted_nodes, links, node_tiers, connections,  orientation='vertical'):
     x_start, y_start = 100, 100
     padding_x, padding_y = 200, 200
     positions = {}
@@ -131,71 +165,113 @@ def calculate_positions(sorted_nodes, links, node_tiers):
         tier = node_tiers[node]
         nodes_by_tier[tier].append(node)
 
-    # Sort and position nodes within each tier
+    # Adjusted part for horizontal topology
     for tier, tier_nodes in nodes_by_tier.items():
+        ordered_tier_nodes = prioritize_node_placement(tier_nodes, adjacency)
 
-        ordered_tier_nodes = prioritize_node_placement(tier_nodes, adjacency)  # Assuming this function is implemented
+        if orientation == 'vertical':
+            x_pos = x_start
+            for node in ordered_tier_nodes:
+                positions[node] = (x_pos, y_start + tier * padding_y)
+                x_pos += padding_x
 
-        x_pos = x_start
-        for node in ordered_tier_nodes:
-            positions[node] = (x_pos, y_start + tier * padding_y)
-            x_pos += padding_x
+        elif orientation == 'horizontal':
+            y_pos = y_start
+            for node in ordered_tier_nodes:
+                positions[node] = (x_start + tier * padding_x, y_pos)
+                y_pos += padding_y
+    # Center alignment logic for both orientations
+    if orientation == 'vertical':
+        tier_centers = {tier: (min(positions[node][0] for node in nodes) + max(positions[node][0] for node in nodes)) / 2 for tier, nodes in nodes_by_tier.items()}
+        widest_tier_center = tier_centers[max(nodes_by_tier.keys(), key=lambda t: len(nodes_by_tier[t]))]
 
-    # Center alignment starts here
-    # Calculate the center for each tier
-    tier_centers = {tier: (min(positions[node][0] for node in nodes) + max(positions[node][0] for node in nodes)) / 2 for tier, nodes in nodes_by_tier.items()}
+        for tier, nodes in nodes_by_tier.items():
+            tier_center = tier_centers[tier]
+            offset = widest_tier_center - tier_center
+            for node in nodes:
+                positions[node] = (positions[node][0] + offset, positions[node][1])
+        adjust_overlapping_nodes(nodes_by_tier, positions, offset_amount=250, orientation='vertical')
 
-    # Find the tier with the most nodes to use as reference for centering
-    widest_tier_center = tier_centers[max(nodes_by_tier.keys(), key=lambda t: len(nodes_by_tier[t]))]
+    elif orientation == 'horizontal':
+        # Adjust y_start based on connections for nodes that have connections to higher tiers
+        y_pos = y_start
+        nodes_adjustment = defaultdict(int)  # Dictionary to hold the adjustment needed for y positions
 
-    # Adjust positions to center each tier with respect to the widest tier's center
-    for tier, nodes in nodes_by_tier.items():
-        tier_center = tier_centers[tier]
-        offset = widest_tier_center - tier_center
-        for node in nodes:
-            positions[node] = (positions[node][0] + offset, positions[node][1])
+        for node in sorted_nodes:
+            if node in nodes_by_tier[node_tiers[node]]:
+                downstream_nodes = connections[node]['downstream']
+                max_tier_downstream = max([node_tiers[n] for n in downstream_nodes if n in node_tiers] + [node_tiers[node]])
+                # Calculate the adjustment needed based on the difference in tiers
+                tier_difference = max_tier_downstream - node_tiers[node]
+                if tier_difference > 0:
+                    nodes_adjustment[node] = tier_difference * padding_y // 2  # Modify the divisor as needed for visual appearance
+
+        for tier, tier_nodes in nodes_by_tier.items():
+            for node in tier_nodes:
+                positions[node] = (x_start + tier * padding_x, y_pos + nodes_adjustment[node])
+                y_pos += padding_y
+
+        # Apply center alignment adjustments for the horizontal layout
+        tier_centers = {tier: (min(positions[node][1] for node in nodes) + max(positions[node][1] for node in nodes)) / 2 for tier, nodes in nodes_by_tier.items()}
+        tallest_tier_center = tier_centers[max(nodes_by_tier.keys(), key=lambda t: len(nodes_by_tier[t]))]
+
+        for tier, nodes in nodes_by_tier.items():
+            tier_center = tier_centers[tier]
+            offset = tallest_tier_center - tier_center
+            for node in nodes:
+                # Apply the calculated offset to center the nodes vertically within their tier
+                positions[node] = (positions[node][0], positions[node][1] + offset)
+        adjust_overlapping_nodes(nodes_by_tier, positions, offset_amount=250, orientation='horizontal')
+
 
     return positions
 
 
-def create_link_style(base_style, positions, source, target, source_tier, target_tier, offset_index, total_links):
-    source_x = positions[source][0]
-    target_x = positions[target][0]
-    source_y = positions[source][1]
-    target_y = positions[target][1]
+def create_link_style(base_style, positions, source, target, source_tier, target_tier, offset_index, total_links, orientation='vertical'):
+    source_x, source_y = positions[source]
+    target_x, target_y = positions[target]
+    same_graph_level = source_tier == target_tier
 
-    # If there's only one link between these two nodes
-    if total_links == 1:
-        if source_tier == target_tier:
-            # Single horizontal connection
+    if orientation == 'vertical':
+        if total_links == 1 and same_graph_level and source_x < target_x:
+            # For same graph-level from left to right
+            entryX, exitX = 0, 1
             entryY = exitY = 0.5
-            entryX = 0 if source_x < target_x else 1
-            exitX = 0 if target_x < source_x else 1
+        elif total_links == 1 and same_graph_level:
+            # For same graph-level from right to left
+            entryX, exitX = 0, 1
+            entryY = exitY = 0.5
         else:
-            # Single vertical connection
-            entryY = 0 if source_y < target_y else 1
-            exitY = 1 if source_y < target_y else 0
-            entryX = exitX = 0.5  # Centered for vertical
-    else:
-        # Multiple connections between these two nodes
-        step = 0.5 / (total_links - 1)
-        position = 0.25 + (offset_index * step)
+            entryX = exitX = 0.5  # Default for vertical links
+            if total_links > 1:
+                # Adjust for multiple links
+                step = 1.0 / total_links
+                entryY = exitY = step * (offset_index + 1) - step / 2
+            else:
+                entryY = 0 if source_y < target_y else 1
+                exitY = 1 if source_y < target_y else 0
 
-        if source_tier == target_tier:
-            # Distribute connections horizontally
-            entryY = exitY = position
-            entryX = 0 if source_x < target_x else 1
-            exitX = 0 if target_x < source_x else 1
+    elif orientation == 'horizontal':
+        if total_links == 1 and same_graph_level and source_y < target_y:
+            # For same graph-level from top to bottom
+            entryY, exitY = 0, 1
+            entryX = exitX = 0.5
+        elif total_links == 1 and same_graph_level:
+            # For same graph-level from bottom to top
+            entryY, exitY = 0, 1
+            entryX = exitX = 0.5
         else:
-            # Distribute connections vertically
-            entryY = 0 if source_y < target_y else 1
-            exitY = 1 if source_y < target_y else 0
-            entryX = exitX = position  # Distribute along X-axis for vertical connections
+            entryY = exitY = 0.5  # Default for horizontal links
+            if total_links > 1:
+                # Adjust for multiple links
+                step = 1.0 / total_links
+                entryX = exitX = step * (offset_index + 1) - step / 2
+            else:
+                entryX = 0 if source_x < target_x else 1
+                exitX = 1 if source_x < target_x else 0
 
-    # Update the style string with the calculated positions
-    updated_style = f"{base_style}entryY={entryY};exitY={exitY};entryX={entryX};exitX={exitX};exitDy=0;entryDy=0;entryDx=0;exitDx=0;"
+    updated_style = f"{base_style}entryY={entryY};exitY={exitY};entryX={entryX};exitX={exitX};"
     return updated_style
-
 
 def add_nodes_and_links(diagram, nodes, positions, links, node_tiers):
     # Add nodes to the diagram with their calculated positions
@@ -269,7 +345,7 @@ def add_nodes_and_links(diagram, nodes, positions, links, node_tiers):
         source_tier = node_tiers[source]
         target_tier = node_tiers[target]
 
-        unique_link_style = create_link_style(link_style, positions, source, target, source_tier, target_tier, link_index, total_links)
+        unique_link_style = create_link_style(link_style, positions, source, target, source_tier, target_tier, link_index, total_links, orientation=args.orientation)
 
         # Add the link to the diagram with the determined unique style
         if not args.no_links:
@@ -306,8 +382,8 @@ def main(filename, output_dir='./Output'):
         # Keep only linked nodes if --include-unlinked-nodes is not set
         nodes = {node: info for node, info in nodes.items() if node in linked_nodes}
 
-    sorted_nodes, node_tiers = assign_tiers(nodes, links)
-    positions = calculate_positions(sorted_nodes, links, node_tiers)
+    sorted_nodes, node_tiers, connections = assign_tiers(nodes, links)
+    positions = calculate_positions(sorted_nodes, links, node_tiers, connections, orientation=args.orientation)
 
     # Create a draw.io diagram instance
     diagram = drawio_diagram()
@@ -339,15 +415,11 @@ def main(filename, output_dir='./Output'):
 def parse_arguments():
     parser = argparse.ArgumentParser(description='Generate a topology diagram from a containerlab YAML file.')
     parser.add_argument('filename', help='The filename of the containerlab YAML file')
-    parser.add_argument('--include-unlinked-nodes', action='store_true',
-                        help='Include nodes without any links in the topology diagram')
-    parser.add_argument('--no-links', action='store_true',
-                        help='Do not draw links between nodes in the topology diagram')
-    parser.add_argument('--output-dir', type=str, default='./Output',
-                        help='Specify the output directory for the topology diagram')
+    parser.add_argument('--include-unlinked-nodes', action='store_true', help='Include nodes without any links in the topology diagram')
+    parser.add_argument('--no-links', action='store_true', help='Do not draw links between nodes in the topology diagram')
+    parser.add_argument('--output-dir', type=str, default='./Output', help='Specify the output directory for the topology diagram')
+    parser.add_argument('--orientation', type=str, default='vertical', choices=['vertical', 'horizontal'], help='Specify the orientation of the topology diagram (vertical or horizontal)')
     return parser.parse_args()
-
-
 
 if __name__ == "__main__":
     args = parse_arguments()
