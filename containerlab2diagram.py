@@ -223,9 +223,7 @@ def calculate_positions(sorted_nodes, links, node_tiers, connections,  orientati
                 positions[node] = (positions[node][0], positions[node][1] + offset)
         adjust_overlapping_nodes(nodes_by_tier, positions, offset_amount=250, orientation='horizontal')
 
-
     return positions
-
 
 def create_link_style(base_style, positions, source, target, source_tier, target_tier, offset_index, total_links, orientation='vertical'):
     source_x, source_y = positions[source]
