@@ -10,7 +10,8 @@ If you need the opposite, to generate a Containerlab (clab) file from a draw.io 
 
 - **Automatic Diagram Generation**: Converts containerlab YAML configurations into detailed Draw.io diagrams.
 - **Intelligent Node Placement**: Attempts to determine the best placement for nodes automatically. However, for complex topologies, this can be challenging.
-- **Tier-Based Layout**: Organizes nodes into tiers based on their connectivity for clearer topology visualization. Users can influence node placement by specifying tiers directly in the containerlab configuration.
+- **Graph-level-Based Layout**: Organizes nodes into graph-level based on their connectivity for clearer topology visualization. Users can influence node placement by specifying graph-level directly in the containerlab configuration.
+- **Graph-icon Support**: Enhances node visualization by allowing users to specify graph-icon labels such as router, switch, or host to define custom icons for nodes in the generated diagrams.
 - **Customizable Styles**: Supports customization of node and link styles within the diagrams.
 
 ## Running with Docker
@@ -64,23 +65,25 @@ The output will be a Draw.io diagram file saved in the ./Output directory. You c
 
 ### Influencing Node Placement
 
-The tool attempts to determine the best placement for nodes automatically. However, achieving an optimal layout for complex topologies might be challenging. You can influence the behavior by setting the `tier` as a label in the containerlab file. This approach impacts the vertical placement of nodes in the generated diagram, where a lower tier number (e.g., `tier: 1`) indicates a position towards the top of the canvas, and a higher tier number will place the node further down the canvas. This feature allows you to suggest a specific vertical hierarchy for each node, aiding the tool in organizing the topology more effectively.
+The tool attempts to determine the best placement for nodes automatically. However, achieving an optimal layout for complex topologies might be challenging. You can influence the behavior by setting the `graph-level` as a label in the containerlab file. This approach impacts the vertical placement of nodes in the generated diagram, where a lower graph-level number (e.g., `graph-level: 1`) indicates a position towards the top of the canvas, and a higher graph-level number will place the node further down the canvas. This feature allows you to suggest a specific vertical hierarchy for each node, aiding the tool in organizing the topology more effectively.
 
-Example configuration to set node tiers:
+Example configuration to set node graph-level:
 
 ```bash
 client1:
   kind: "linux"
   labels:
-    tier: 1 # This node will be placed towards the top of the canvas
+    graph-level: 1 # This node will be placed towards the top of the canvas
+    graph-icon: host # This node will use the client icon
 ```
 ```bash
-server1:
+spine1:
   kind: "linux"
   labels:
-    tier: 2  # This node will be placed below tier 1 nodes on the canvas
+    graph-level: 2  # This node will be placed below graph-level 1 nodes on the canvas
+    graph-icon: switch # This node will use the switch icon
 ```
-Using tiers helps manage the vertical alignment of nodes in the generated diagram, making it easier to visualize the hierarchical structure of your network.
+Using graph-level helps manage the vertical alignment of nodes in the generated diagram, making it easier to visualize the hierarchical structure of your network.
 
 ### Command-Line Arguments
 

@@ -5,8 +5,16 @@ import argparse
 import os
 
 def assign_tiers(nodes, links):
-    # Initialize all nodes with no tier (-1) or with their specified tier if present
-    node_tiers = {node: nodes[node].get('labels', {}).get('tier', -1) for node in nodes}
+    # Initialize all nodes with no tier (-1) or with their specified tier or graph-level if present
+    node_tiers = {}
+    for node in nodes:
+        if 'labels' in nodes[node]:
+            graph_level = nodes[node]['labels'].get('graph-level', -1)
+            tier = nodes[node]['labels'].get('tier', -1)
+            # Prioritize graph-level over tier if graph-level is defined
+            node_tiers[node] = graph_level if graph_level != -1 else tier
+        else:
+            node_tiers[node] = -1
 
     # Initialize the connections dictionary
     connections = {node: {'upstream': set(), 'downstream': set()} for node in nodes}
@@ -207,10 +215,31 @@ def add_nodes_and_links(diagram, nodes, positions, links, node_tiers):
         "server": base_style + "image=data:image/png,iVBORw0KGgoAAAANSUhEUgAAAFkAAABZCAMAAABi1XidAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAHCUExURQAQNgARNgARNQAAHAAAHQAAIQAAIwAAJAAAJQAAJgAAJwABJgABJwACKAADKQAEKgAFKwAGLAAHLAAHLQAILAAILQAILgAJLgAKLwALMAAMMAAMMQANMQANMgAOMgAOMwAPMwAPNAAQNAARNQASNQASNgILLwQOMgUWOQgTNwgYOwkVOQkZPAwcPgwcPw0dPw4eQA8aPA8cPg8fQRwrSx0sTB4pSR4tTCEwTyMyUSMzUiQzUiU0UyY1Uyk0Uis5Vy07WTA7WDA+XDRBXjU/XDdGYT1LZkBJZUBKZUNPaUdSbEdUbklSbEtXcExWb05ac1NedlVgeFljel5pgF9mfl9qgWBrgmZwhmxziHF6jnJ8kHN8kHR9kXV+knV/knZ/k3eAlHh/kniBlHiClHl/knuAk4CJmoaNnoePoImRoYuTo5GZqJSaqZacq5eerJeerZicq5ierZmdrJqfrpqhr6OntKmsua+1wLC0wLW6xL7BysLFztHU2tHU29TX3d/h5t/i5uLl6Obo6+fo7Ofp7Ojp7Orr7urs7+zt8PHy9PT19/X29/b29/b2+Pb3+Pf4+fj5+vn6+vv8/P3+/v7+/v////GBh4cAAAADdFJOU+jz9a/B8SsAAAAJcEhZcwAAFxEAABcRAcom8z8AAAImSURBVGhD7dj3UxNBFMDxRMDLYnJJFIgRiHBrLNiw994LKjYExV6x9441YgFr3v/rJfcu827XC7O5yy/Ofn/Km8x95mazk7m9CK9TUS2TtEzTMk3LtP9EtrIZ9bIWXl1JlhOpFatWKtebNPF6N1HONR98/mli/Jta4xOFZ3tYFxpOgtxtXoNauxD3rIggswGAn48vD59Ta/jKkz8A/dNQKeeVs8s/w9jOJiOmmtG09wu8XdCJTimvHD8MMNCIg1qNFwF201/RKxtDUNyQxkGuIyPtrUrJ7QAnGA6lBPmMLc/AQSyfmb8mMxsHqfQWgJNV5NNQ3Ognz1z96sftuX53nd5a/Z6rycYle2ut9/s2iGzuB3izrB0nsSAyb+s7v7Z1Dg5igWRuxtry+FEqmFwtLdO0TNMyTcs0LdO0TNMyTcs0LdMmk+1n/nU1ypM88w9CcVMKB7XMHQDH/OXEAYCzDf7HHP+6Gq4D7EriVMordyx8B18PMYMpFjPiR3/B6Dx6PvLKnB2xzyIv7t29r9adBy/t6/YlUCknyJyd+l06Q9fQ9+N0lWXZYtsejn4ofFSr8P71rc1eWJI5TzVbS5aqtribpYUjjCxznpulXLt8tv2XHE71l/MpfFMRvOnOgrtya//IjXAa6Wspi65sPMVtGbxHU8uiK8dvjoXVVed1kitbi3rDqsf5R3Nl3pkNq5wDVuTQ0zJNyzQt07RMq588JRKtT9HIXyTFPzou9sSWAAAAAElFTkSuQmCC;"
     }
 
+    # Map 'graph-icon' values to the corresponding group used in 'custom_styles'
+    icon_to_group_mapping = {
+        "router": "dcgw",
+        "switch": "leaf", # or "spine" depending on your specific use case
+        "host": "server"
+    }
+
     for node_name, node_info in nodes.items():
-        group = node_info.get('group', None)
-        if group not in custom_styles:
-                group = 'default'  
+        # Check for 'graph-icon' label and map it to the corresponding group
+        icon_label = node_info.get('labels', {}).get('graph-icon')
+        if icon_label in icon_to_group_mapping:
+            group = icon_to_group_mapping[icon_label]
+        else:
+            # Determine the group based on the node's name if 'graph-icon' is not specified
+            if "client" in node_name:
+                group = "server"
+            elif "leaf" in node_name:
+                group = "leaf"
+            elif "spine" in node_name:
+                group = "spine"
+            elif "dcgw" in node_name:
+                group = "dcgw"
+            else:
+                group = "default"  # Fallback to 'default' if none of the conditions are met
+
         style = custom_styles.get(group, base_style)
         x_pos, y_pos = positions[node_name]
         # Add each node to the diagram with the given x and y position.
