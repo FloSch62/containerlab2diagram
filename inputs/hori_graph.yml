@@ -1,0 +1,338 @@
+name: EVPN-Interop
+prefix: ""
+
+mgmt:
+  network: mgmt_interp-evpn              # management network name
+  bridge: br-evpn-interop
+  ipv4-subnet: 172.50.60.0/24      # ipv4 range
+#  ipv6_subnet: 2001:172:100:100::/80    # ipv6 range (optional)
+#  mtu: 1500   # # set mtu of the management network to 1500
+  ipv4-gw: 172.50.60.1   # # setcustom ipv4 gw
+
+topology:
+  kinds:
+#Containerlab supports a fixed number of kinds.
+#Within each predefined kind we store the necessary information that is used to launch the container successfully
+    nokia_srlinux:
+#Nokia SR Linux NOS is identified with srl kind in the topology file.
+#to connect to the SR Linux CLI : sudo docker exec -it <container-name/id> sr_cli
+#to connect with SSH ssh admin@<container-name> Default user credentials: admin:NokiaSrl1!
+#to connect with SSH ssh linuxadmin@<container-name>
+#to connect with SSH ssh linuxadmin@<generic name>
+      image: ghcr.io/nokia/srlinux:23.7.2
+    vr-sros:
+#Nokia SR OS virtualized router is identified with vr-sros kind in the topology file.
+#to connect to the SR OS CLI : sudo docker exec -it <container-name/id> bash
+#to connect with SSH ssh admin@<container-name> Default user credentials: admin:admin
+      image: registry.srlinux.dev/pub/vr-sros:23.10.R1
+      license: /opt/nokia/license-23.txt
+    linux:
+#The linux container is a node of a specific kind, linux in this case.
+#to connect to the linux : sudo docker exec -it <container-name/id> bash
+      image: ghcr.io/hellt/network-multitool
+  nodes:
+#Linux bridges:
+#Containerlab can connect its nodes to a Linux bridge instead of interconnecting the nodes directly.
+#This bridge is not used today for this project.
+#This connectivity option is enabled with bridge kind and opens a variety of integrations that containerlab labs can have with workloads of other types.
+#The bridges have to be created manually
+
+
+#-----------------------------------------------------------
+#IXR  Creation
+#4 IXR SRlinux  are defined
+#-----------------------------------------------------------
+
+    srl-1:
+      kind: nokia_srlinux
+      mgmt-ipv4: 172.50.60.51
+      type: ixrd2l
+      startup-config: configs/fabric/srl-1.cfg
+      binds:
+        - configs/fabric/oper-group-ebgp.py:/etc/opt/srlinux/eventmgr/oper-group-ebgp.py
+      ports:
+        - 58231:22/tcp
+        - 57431:50052
+        - 57031:80/tcp
+      labels:
+        graph-level: 4
+        graph-icon: switch
+    srl-2:
+      kind: nokia_srlinux
+      mgmt-ipv4: 172.50.60.52
+      type: ixrd2l
+      startup-config: configs/fabric/srl-2.cfg
+      binds:
+        - configs/fabric/oper-group-ebgp.py:/etc/opt/srlinux/eventmgr/oper-group-ebgp.py
+      ports:
+        - 58232:22/tcp
+        - 57432:50052
+        - 57032:80/tcp
+      labels:
+        graph-level: 4
+        graph-icon: switch
+    srl-3:
+      kind: nokia_srlinux
+      mgmt-ipv4: 172.50.60.53
+      type: ixrd2l
+      startup-config: configs/fabric/srl-3.cfg
+      binds:
+        - configs/fabric/oper-group-ebgp.py:/etc/opt/srlinux/eventmgr/oper-group-ebgp.py
+      ports:
+        - 58233:22/tcp
+        - 57433:50052
+        - 57033:80/tcp
+      labels:
+        graph-level: 3
+        graph-icon: switch
+    vswitch-1:
+      kind: juniper_vjunosevolved
+      mgmt-ipv4: 172.50.60.54
+      image:  vr-vjunosevolved:23.2R1-S1.8-EVO
+      startup-config: configs/junos/vjunos.cfg
+      ports:
+        - 58235:22/tcp
+        - 57435:50052
+        - 57035:80/tcp
+      labels:
+        graph-level: 3
+
+
+        
+#-----------------------------------------------------------
+# CORE   Creation
+#2 PE 7750  are defined
+#-----------------------------------------------------------
+
+    7750-CORE-1:
+      kind: vr-sros
+      mgmt-ipv4: 172.50.60.31
+      startup-config: configs/core/CORE1.partial.cfg
+      ports:
+        - 58221:22/tcp
+        - 57421:50052
+        - 57021:80/tcp
+      labels:
+        graph-level: 5
+    7750-CORE-2:
+      kind: vr-sros
+      mgmt-ipv4: 172.50.60.32
+      startup-config: configs/core/CORE2.partial.cfg
+      ports:
+        - 58222:22/tcp
+        - 57422:50052
+        - 57022:80/tcp
+      labels:
+        graph-level: 5
+        
+#-----------------------------------------------------------
+# DCIGW PE   Creation
+#2 PE 7750  are defined
+#-----------------------------------------------------------        
+
+    7750-DCIGW-1:
+      kind: vr-sros
+      mgmt-ipv4: 172.50.60.33
+      startup-config: configs/pe/gw1.partial.cfg
+      ports:
+        - 58211:22/tcp
+        - 57411:50052
+        - 57011:80/tcp
+      labels:
+        graph-level: 6
+
+    7750-DCIGW-2:
+      kind: vr-sros
+      mgmt-ipv4: 172.50.60.34
+      startup-config: configs/pe/gw2.partial.cfg
+      ports:
+        - 58212:22/tcp
+        - 57412:50052
+        - 57012:80/tcp
+      labels:
+        graph-level: 6
+
+    7750-DCIGW-3:
+      kind: vr-sros
+      mgmt-ipv4: 172.50.60.35
+      startup-config: configs/pe/gw3.partial.cfg
+      ports:
+        - 58213:22/tcp
+        - 57413:50052
+        - 57013:80/tcp
+      labels:
+        graph-level: 7
+
+#-----------------------------------------------------------
+#L2  switches 
+# 2 IXR 7220  defined 
+#-----------------------------------------------------------    
+
+    L2-SW-1:
+      kind: nokia_srlinux
+      mgmt-ipv4: 172.50.60.41
+      type: ixrd2l
+      startup-config: configs/switch/sw-1.json
+      ports:
+        - 58241:22/tcp
+        - 57441:50052
+        - 57041:80/tcp
+      labels:
+        graph-level: 2
+        graph-icon: switch
+    L2-SW-2:
+      kind: nokia_srlinux
+      mgmt-ipv4: 172.50.60.42
+      type: ixrd2l
+      startup-config: configs/switch/sw-2.json
+      ports:
+        - 58252:22/tcp
+        - 57452:50052
+        - 57052:80/tcp
+      labels:
+        graph-level: 2
+        graph-icon: switch
+#-----------------------------------------------------------   
+### TELEMETRY STACK ###
+#-----------------------------------------------------------   
+    gnmic:
+      kind: linux
+      mgmt-ipv4: 172.50.60.21
+      image: ghcr.io/openconfig/gnmic:0.29.0
+      binds:
+        - configs/gnmic/gnmic-config.yml:/gnmic-config.yml:ro
+      cmd: --config /gnmic-config.yml --log subscribe
+      group: "10" # group 10 is assigned to the nodes of a telemetry stack
+
+    prometheus:
+      kind: linux
+      mgmt-ipv4: 172.50.60.22
+      image: prom/prometheus:v2.35.0
+      binds:
+        - configs/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      cmd: --config.file=/etc/prometheus/prometheus.yml
+      ports:
+        - 9090:9090
+      group: "10"
+
+    grafana:
+      kind: linux
+      mgmt-ipv4: 172.50.60.23
+      image: grafana/grafana:9.5.2
+      binds:
+        - configs/grafana/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yaml:ro
+        - configs/grafana/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yaml:ro
+        - configs/grafana/dashboards:/var/lib/grafana/dashboards
+      ports:
+        - 3000:3000
+      env:
+        GF_INSTALL_PLUGINS: https://algenty.github.io/flowcharting-repository/archives/agenty-flowcharting-panel-1.0.0d.220606199-SNAPSHOT.zip;agenty-flowcharting-panel,https://github.com/cloudspout/cloudspout-button-panel/releases/download/7.0.23/cloudspout-button-panel.zip;cloudspout-button-panel
+        GF_ORG_ROLE: "Editor"
+        GF_ORG_NAME: "Main Org."
+        GF_AUTH_ANONYMOUS_ENABLED: "true"
+        GF_AUTH_ANONYMOUS: "true"
+        GF_SECURITY_ALLOW_EMBEDDING: "true"
+        GF_DASHBOARDS_MIN_REFRESH_INTERVAL: 2s
+        http_proxy:  ${https_proxy}
+        https_proxy:  ${http_proxy}
+        no_proxy:  "prometheus,http://prometheus:9090,172.50.60.22"
+      group: "10"
+      
+#-----------------------------------------------------------
+# Servers
+#-----------------------------------------------------------    
+    client1:
+      kind: linux
+      mgmt-ipv4: 172.50.60.11
+      binds:
+        - configs/hosts/client1.sh:/root/script_int.sh
+        - configs/hosts/iperf-1-s.sh:/config/iperf1.sh
+        - configs/hosts/iperf-1-2.sh:/config/iperf2.sh
+      exec:
+        - bash /root/script_int.sh
+        - ip address add 192.168.0.11/24 dev eth1.10
+        - ip route add 192.168.2.0/24 via 192.168.0.254
+      labels:
+        graph-level: 1
+        graph-icon: host
+
+    client2:
+      kind: linux
+      mgmt-ipv4: 172.50.60.12
+      binds:
+        - configs/hosts/client2.sh:/root/script_int.sh
+        - configs/hosts/iperf-2-s.sh:/config/iperf1.sh
+      exec:
+        - bash /root/script_int.sh
+        - ip address add 192.168.0.21/24 dev eth1.10
+        - ip route add 192.168.2.0/24 via 192.168.0.254
+
+      labels:
+        graph-level: 1
+        tier: 1
+        graph-icon: host
+
+    server:
+      kind: linux
+      mgmt-ipv4: 172.50.60.13
+      binds:
+        - configs/hosts/server1.sh:/root/script_int.sh
+      exec:
+        - bash /root/script_int.sh
+        - iperf3 -s -p 5201 -D > iperf3_1.log
+        - iperf3 -s -p 5202 -D > iperf3_2.log
+        - ip address add 192.168.2.11/24 dev eth1.10
+        - ip route add 192.168.0.0/24 via 192.168.2.1
+
+      labels:
+        graph-level: 8
+        graph-icon: host
+#-----------------------------------------------------------
+#Graphite for topology visualization
+#-----------------------------------------------------------  
+    ssh:
+      kind: linux
+      image: netreplica/graphite:webssh2
+      env:
+        GRAPHITE_DEFAULT_TYPE: clab
+        GRAPHITE_DEFAULT_TOPO: POC-REMIP
+        CLAB_SSH_CONNECTION: ${SSH_CONNECTION}
+      binds:
+        - .:/htdocs/clab
+      ports:
+        - 8080:80
+      exec:
+        - sh -c 'graphite_motd.sh 8080'
+      labels:
+        graph-hide: yes
+
+  links:
+    - endpoints: ["srl-1:e1-50", "srl-2:e1-50"]
+    - endpoints: ["srl-1:e1-51", "srl-3:e1-51"]
+    - endpoints: ["srl-1:e1-52", "7750-CORE-1:eth1"]
+    - endpoints: ["srl-2:e1-52", "7750-CORE-2:eth1"]
+    - endpoints: ["srl-3:e1-52", "7750-CORE-1:eth2"]
+    - endpoints: ["7750-CORE-1:eth3", "7750-CORE-2:eth3" ]
+    - endpoints: ["7750-CORE-1:eth4", "7750-DCIGW-1:eth1"]
+    - endpoints: ["7750-CORE-2:eth4", "7750-DCIGW-2:eth1"]
+
+    - endpoints: ["L2-SW-1:e1-1", "srl-1:e1-1"]
+    - endpoints: ["L2-SW-1:e1-2", "srl-3:e1-1"]
+    - endpoints: ["L2-SW-2:e1-50", "srl-2:e1-55"]
+
+    - endpoints: ["7750-CORE-2:eth5", "vswitch-1:eth3"]
+    - endpoints: ["srl-2:e1-54", "vswitch-1:eth1"]
+    - endpoints: ["srl-3:e1-54", "vswitch-1:eth2"]
+    - endpoints: ["L2-SW-2:e1-52", "vswitch-1:eth4"]
+
+#-----------------------
+#Links server to leafs : 114
+#Possibility to defined up to 3 NICs - translated into eth1 up to eth6 in contanierlab
+#-----------------------
+
+    - endpoints: ["client1:eth1",  "L2-SW-1:e1-10"]
+    - endpoints: ["client2:eth1",  "L2-SW-2:e1-10"]
+
+    - endpoints: ["7750-DCIGW-1:eth2", "7750-DCIGW-3:eth1"]
+    - endpoints: ["7750-DCIGW-2:eth2", "7750-DCIGW-3:eth2"]
+    - endpoints: ["7750-DCIGW-3:eth3", "server:eth1"]
